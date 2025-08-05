@@ -37,7 +37,7 @@ uploaded_file = st.file_uploader(
 # Upload Trigger
 # -----------------------------
 def send_file_to_webhook(file_bytes: bytes, filename: str):
-    url = "https://bizmaxus.app.n8n.cloud/webhook-test/csv"
+    url = "https://bizmaxus.app.n8n.cloud/webhook/csv"
     files = {"data": (filename, BytesIO(file_bytes), "application/octet-stream")}
     try:
         response = requests.post(url, files=files, timeout=15)
