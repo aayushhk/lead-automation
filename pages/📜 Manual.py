@@ -8,10 +8,9 @@ from io import BytesIO
 st.set_page_config(
     page_title="Trigger Webhook",
     page_icon="📤",
-    layout="wide",
+    layout="centered",
     initial_sidebar_state="expanded"
 )
-
 
 # -----------------------------
 # Main Page
@@ -34,13 +33,25 @@ uploaded_file = st.file_uploader(
 )
 
 # -----------------------------
+# Intention Input
+# -----------------------------
+intention = st.text_input(
+    label="Intention",
+    placeholder="Enter the intention for this upload...",
+    help="This text will be sent along with your file."
+)
+
+# -----------------------------
 # Upload Trigger
 # -----------------------------
-def send_file_to_webhook(file_bytes: bytes, filename: str):
-    url = "https://bizmaxus.app.n8n.cloud/webhook/csv"
-    files = {"data": (filename, BytesIO(file_bytes), "application/octet-stream")}
+def send_file_to_webhook(file_bytes: bytes, filename: str, intention_text: str):
+    url = "https://bizmaxus.app.n8n.cloud/webhook-test/csv"
+    files = {
+        "data": (filename, BytesIO(file_bytes), "application/octet-stream")
+    }
+    data = {"intention": intention_text}  # extra field in body
     try:
-        response = requests.post(url, files=files, timeout=15)
+        response = requests.post(url, files=files, data=data, timeout=15)
         response.raise_for_status()
         return True, response.text
     except requests.exceptions.RequestException as e:
@@ -52,14 +63,17 @@ def send_file_to_webhook(file_bytes: bytes, filename: str):
 if uploaded_file:
     st.info(f"File ready: **{uploaded_file.name}** ({uploaded_file.size} bytes)")
     if st.button("🚀 Send to Webhook"):
-        with st.spinner("Sending file to webhook..."):
-            success, result = send_file_to_webhook(uploaded_file.read(), uploaded_file.name)
-        if success:
-            st.success("✅ File sent successfully!")
-            st.code(result, language='json')
+        if not intention.strip():
+            st.error("⚠ Please enter an intention before sending.")
         else:
-            st.error("❌ Upload failed!")
-            st.text(result)
+            with st.spinner("Sending file to webhook..."):
+                success, result = send_file_to_webhook(uploaded_file.read(), uploaded_file.name, intention)
+            if success:
+                st.success("✅ File sent successfully!")
+                st.code(result, language='json')
+            else:
+                st.error("❌ Upload failed!")
+                st.text(result)
 else:
     st.warning("👈 Please select a file to continue.")
 
