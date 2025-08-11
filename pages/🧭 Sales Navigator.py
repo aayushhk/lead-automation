@@ -5,7 +5,7 @@ import streamlit as st
 
 # --- Function to send file + intention to webhook ---
 def send_file_to_webhook(file_bytes: bytes, filename: str, intention: str):
-    url = "https://bizmaxus.app.n8n.cloud/webhook-test/salesnav"
+    url = "https://bizmaxus.app.n8n.cloud/webhook/salesnav"
     files = {"data": (filename, BytesIO(file_bytes), "application/octet-stream")}
     data = {"intention": intention}  # extra field in the body
     try:
@@ -109,7 +109,7 @@ webhook_url = ""
 if reveal_phone_number:
     webhook_url = st.text_input(
         "Webhook URL (Required if revealing phone numbers)",
-        value="https://bizmaxus.app.n8n.cloud/webhook-test/salesnav"
+        value="https://bizmaxus.app.n8n.cloud/webhook/salesnav"
     )
 
 # --- Enrich Lead Button ---
