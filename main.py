@@ -1,3 +1,4 @@
+# bulk_lead_processor.py
 from io import BytesIO
 import streamlit as st
 import pandas as pd
@@ -5,14 +6,25 @@ import requests
 from urllib.parse import urlparse, parse_qs, urlencode
 import re
 
-st.title("Apollo.io People Extractor")
+# --- Page Config ---
+st.set_page_config(
+    page_title="Lead Machine",
+    page_icon="🚀",
+    layout="wide"
+)
 
-api_key = st.text_input("Enter your Apollo API Key", type="password")
-apollo_ui_url = st.text_area("Paste Apollo People Search URL", height=100)
-numberpages = st.number_input("Number of pages to fetch", min_value=1, max_value=500, value=1)
-perpage = st.number_input("Number of results per page", min_value=1, max_value=100, value=100)
+st.markdown(
+    "🚀 Bulk Lead Processor",
+    unsafe_allow_html=True
+)
 
-# mapping from frontend (UI) param keys to API param keys
+# --- Inputs ---
+api_key = st.text_input("🔑 Enter your Apollo API Key", type="password")
+apollo_ui_url = st.text_area("🌐 Paste Apollo People Search URL", height=100)
+numberpages = st.number_input("📄 Number of pages to fetch", min_value=1, max_value=500, value=1)
+perpage = st.number_input("👥 Results per page", min_value=1, max_value=100, value=100)
+
+# --- Apollo param mapping ---
 KEY_MAPPING = {
     "personTitles[]": "person_titles[]",
     "personLocations[]": "person_locations[]",
@@ -39,17 +51,14 @@ KEY_MAPPING = {
 }
 
 def rename_apollo_params(params: dict) -> dict:
-    """Rename frontend-style Apollo UI params to API-ready snake_case keys."""
     api_params = {}
     for key, values in params.items():
         mapped_key = KEY_MAPPING.get(key)
         final_key = mapped_key if mapped_key else re.sub(r'([A-Z])', lambda m: '_' + m.group(1).lower(), key)
         api_params[final_key] = values
-        #st.info(f"Renaming {key} to {final_key}")
     return api_params
 
-def send_file_to_webhook(file_bytes: bytes, filename: str):
-    url = "https://bizmaxus.app.n8n.cloud/webhook/csv"
+def send_file_to_webhook(file_bytes: bytes, filename: str, url: str):
     files = {"data": (filename, BytesIO(file_bytes), "application/octet-stream")}
     try:
         resp = requests.post(url, files=files, timeout=15)
@@ -58,6 +67,7 @@ def send_file_to_webhook(file_bytes: bytes, filename: str):
     except Exception as e:
         return False, str(e)
 
+# --- Fetch Leads ---
 if st.button("🔍 Fetch Leads"):
     if not api_key or not apollo_ui_url:
         st.error("Please provide both API key and Apollo search URL.")
@@ -65,14 +75,10 @@ if st.button("🔍 Fetch Leads"):
         try:
             parsed = urlparse(apollo_ui_url)
             raw_qs = parse_qs(parsed.fragment.split('/people?')[-1])
-            
-            # Rename keys to match API format
             api_qs = rename_apollo_params(raw_qs)
-            # Add page and per_page override or append if not present
             api_qs["page"] = [str(numberpages)]
             api_qs["per_page"] = [str(perpage)]
 
-            # Build final URL
             query = urlencode(api_qs, doseq=True)
             api_url = f"https://api.apollo.io/api/v1/mixed_people/search?{query}"
 
@@ -90,16 +96,9 @@ if st.button("🔍 Fetch Leads"):
                 people = data.get("people", [])
                 if people:
                     df = pd.json_normalize(people)
-                    st.dataframe(df)
-                    csv = df.to_csv(index=False).encode("utf-8")
-                    
-                    st.info("Sending CSV to webhook...")
-                    success, result = send_file_to_webhook(csv, "apollo_full_leads.csv")
-                    st.download_button("Download CSV", csv, "apollo_leads_full.csv", "text/csv")
-                    if success:
-                        st.success("CSV sent to webhook successfully.")
-                    else:
-                        st.warning(f"Failed to send CSV to webhook: {result}")
+                    st.session_state["leads_df"] = df
+                    st.success(f"✅ Fetched {len(df)} leads successfully!")
+                    st.dataframe(df, use_container_width=True)
                 else:
                     st.warning("No people found for this query.")
             else:
@@ -107,3 +106,25 @@ if st.button("🔍 Fetch Leads"):
 
         except Exception as e:
             st.error(f"Something went wrong: {e}")
+
+# --- Send Options ---
+if "leads_df" in st.session_state:
+    df = st.session_state["leads_df"]
+    csv_data = df.to_csv(index=False).encode("utf-8")
+
+    col1, col2, col3 = st.columns([1, 1, 2])
+
+    with col1:
+        if st.button("📤 Send to Live"):
+            success, result = send_file_to_webhook(csv_data, "apollo_full_leads.csv",
+                                                   "https://bizmaxus.app.n8n.cloud/webhook/csv")
+            st.success("✅ Sent to Live!") if success else st.error(f"❌ {result}")
+
+    with col2:
+        if st.button("🧪 Send to Test"):
+            success, result = send_file_to_webhook(csv_data, "apollo_full_leads.csv",
+                                                   "https://bizmaxus.app.n8n.cloud/webhook-tests/csv")
+            st.success("✅ Sent to Test!") if success else st.error(f"❌ {result}")
+
+    with col3:
+        st.download_button("💾 Download CSV", csv_data, "apollo_leads_full.csv", "text/csv")
