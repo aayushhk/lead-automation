@@ -122,7 +122,7 @@ if "leads_df" in st.session_state:
     with col2:
         if st.button("🧪 Send to Test"):
             success, result = send_file_to_webhook(csv_data, "apollo_full_leads.csv",
-                                                   "https://bizmaxus.app.n8n.cloud/webhook-tests/csv")
+                                                   "https://bizmaxus.app.n8n.cloud/webhook-test/csv")
             st.success("✅ Sent to Test!") if success else st.error(f"❌ {result}")
 
     with col3:
