@@ -13,9 +13,8 @@ st.set_page_config(
     layout="wide"
 )
 
-st.markdown(
-    "🚀 Bulk Lead Processor",
-    unsafe_allow_html=True
+st.subheader(
+    "🚀 Bulk Lead Processor"
 )
 
 # --- Inputs ---
