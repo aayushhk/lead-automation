@@ -2,17 +2,14 @@ from io import BytesIO
 import requests
 import pandas as pd
 import streamlit as st
-st.set_page_config(
-    page_title="Lead Machine",
-    page_icon="🚀",
-    layout="wide"
-)
-# --- Function to send file to webhook ---
-def send_file_to_webhook(file_bytes: bytes, filename: str):
-    url = "https://bizmaxus.app.n8n.cloud/webhook/salesnav"
+
+# --- Function to send file + intention to webhook ---
+def send_file_to_webhook(file_bytes: bytes, filename: str, intention: str):
+    url = "https://bizmaxus.app.n8n.cloud/webhook-test/salesnav"
     files = {"data": (filename, BytesIO(file_bytes), "application/octet-stream")}
+    data = {"intention": intention}  # extra field in the body
     try:
-        response = requests.post(url, files=files, timeout=15)
+        response = requests.post(url, files=files, data=data, timeout=15)
         response.raise_for_status()
         return True, response.text
     except requests.exceptions.RequestException as e:
@@ -23,6 +20,8 @@ if "df_result" not in st.session_state:
     st.session_state.df_result = None
 if "csv_bytes" not in st.session_state:
     st.session_state.csv_bytes = None
+if "intention" not in st.session_state:
+    st.session_state.intention = ""
 
 # --- Column mapping ---
 COLUMN_MAPPING = {
@@ -91,8 +90,8 @@ st.subheader("🧭 Sales Navigator")
 st.write("Use the fields below to refine your search. You can leave fields empty to search broadly. Results will be enriched with Apollo.io data. ")
 
 with st.container(border=True):
-
     linkedin_url = st.text_input("LinkedIn URL")
+
 with st.expander("Optional Search search fields", expanded=False):
     first_name = st.text_input("First Name")
     last_name = st.text_input("Last Name")
@@ -110,7 +109,7 @@ webhook_url = ""
 if reveal_phone_number:
     webhook_url = st.text_input(
         "Webhook URL (Required if revealing phone numbers)",
-        value="https://bizmaxus.app.n8n.cloud/webhook/salesnav"
+        value="https://bizmaxus.app.n8n.cloud/webhook-test/salesnav"
     )
 
 # --- Enrich Lead Button ---
@@ -165,7 +164,7 @@ if st.button("🔍 Enrich Lead"):
                         if col not in df_result.columns:
                             df_result[col] = None
 
-                    # Reorder columns based on mapping order
+                    # Reorder columns
                     df_result = df_result[list(COLUMN_MAPPING.values())]
 
                     st.session_state.df_result = df_result
@@ -193,9 +192,22 @@ if st.session_state.df_result is not None:
         mime="text/csv"
     )
 
+    # --- Intention Field ---
+    st.session_state.intention = st.text_input(
+        "Intention",
+        value=st.session_state.intention,
+        placeholder="Enter the intention for this upload..."
+    )
+
     if st.button("📤 Add Lead to Campaign"):
-        if st.session_state.csv_bytes:
-            success, msg = send_file_to_webhook(st.session_state.csv_bytes, "enriched_lead.csv")
+        if not st.session_state.intention.strip():
+            st.error("⚠ Please enter an intention before sending.")
+        elif st.session_state.csv_bytes:
+            success, msg = send_file_to_webhook(
+                st.session_state.csv_bytes,
+                "enriched_lead.csv",
+                st.session_state.intention
+            )
             if success:
                 st.success(f"✅ Lead sent to campaign successfully! Response: {msg}")
             else:
