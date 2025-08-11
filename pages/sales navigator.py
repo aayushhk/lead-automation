@@ -2,7 +2,11 @@ from io import BytesIO
 import requests
 import pandas as pd
 import streamlit as st
-
+st.set_page_config(
+    page_title="Lead Machine",
+    page_icon="🚀",
+    layout="wide"
+)
 # --- Function to send file to webhook ---
 def send_file_to_webhook(file_bytes: bytes, filename: str):
     url = "https://bizmaxus.app.n8n.cloud/webhook/salesnav"
