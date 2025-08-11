@@ -13,8 +13,8 @@ st.set_page_config(
     layout="wide"
 )
 
-st.header(
-    "🚀 Bulk Lead Processor"
+st.title(
+    "⛅ Bulk Lead Processor"
 )
 
 # --- Inputs ---
