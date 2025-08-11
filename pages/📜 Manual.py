@@ -45,7 +45,7 @@ intention = st.text_input(
 # Upload Trigger
 # -----------------------------
 def send_file_to_webhook(file_bytes: bytes, filename: str, intention_text: str):
-    url = "https://bizmaxus.app.n8n.cloud/webhook-test/csv"
+    url = "https://bizmaxus.app.n8n.cloud/webhook/csv"
     files = {
         "data": (filename, BytesIO(file_bytes), "application/octet-stream")
     }
