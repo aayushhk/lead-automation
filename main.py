@@ -13,7 +13,7 @@ st.set_page_config(
     layout="wide"
 )
 
-st.subheader(
+st.header(
     "🚀 Bulk Lead Processor"
 )
 
