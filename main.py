@@ -1,4 +1,3 @@
-# bulk_lead_processor.py
 from io import BytesIO
 import streamlit as st
 import pandas as pd
@@ -13,8 +12,9 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title(
-    "⛅ Bulk Lead Processor"
+st.markdown(
+    "🚀 Bulk Lead Processor",
+    unsafe_allow_html=True
 )
 
 # --- Inputs ---
@@ -22,6 +22,10 @@ api_key = st.text_input("🔑 Enter your Apollo API Key", type="password")
 apollo_ui_url = st.text_area("🌐 Paste Apollo People Search URL", height=100)
 numberpages = st.number_input("📄 Number of pages to fetch", min_value=1, max_value=500, value=1)
 perpage = st.number_input("👥 Results per page", min_value=1, max_value=100, value=100)
+
+# Store intention in session state so it persists
+if "intention" not in st.session_state:
+    st.session_state.intention = ""
 
 # --- Apollo param mapping ---
 KEY_MAPPING = {
@@ -57,10 +61,11 @@ def rename_apollo_params(params: dict) -> dict:
         api_params[final_key] = values
     return api_params
 
-def send_file_to_webhook(file_bytes: bytes, filename: str, url: str):
+def send_file_to_webhook(file_bytes: bytes, filename: str, url: str, intention: str):
     files = {"data": (filename, BytesIO(file_bytes), "application/octet-stream")}
+    data = {"intention": intention}
     try:
-        resp = requests.post(url, files=files, timeout=15)
+        resp = requests.post(url, files=files, data=data, timeout=15)
         resp.raise_for_status()
         return True, resp.text
     except Exception as e:
@@ -111,19 +116,38 @@ if "leads_df" in st.session_state:
     df = st.session_state["leads_df"]
     csv_data = df.to_csv(index=False).encode("utf-8")
 
+    # Intention text box
+    st.session_state.intention = st.text_input(
+        "✏ Intention",
+        value=st.session_state.intention,
+        placeholder="Enter the intention for this lead upload..."
+    )
+
     col1, col2, col3 = st.columns([1, 1, 2])
 
     with col1:
         if st.button("📤 Send to Live"):
-            success, result = send_file_to_webhook(csv_data, "apollo_full_leads.csv",
-                                                   "https://bizmaxus.app.n8n.cloud/webhook/csv")
-            st.success("✅ Sent to Live!") if success else st.error(f"❌ {result}")
+            if not st.session_state.intention.strip():
+                st.error("⚠ Please enter an intention before sending.")
+            else:
+                success, result = send_file_to_webhook(
+                    csv_data, "apollo_full_leads.csv",
+                    "https://bizmaxus.app.n8n.cloud/webhook/csv",
+                    st.session_state.intention
+                )
+                st.success("✅ Sent to Live!") if success else st.error(f"❌ {result}")
 
     with col2:
         if st.button("🧪 Send to Test"):
-            success, result = send_file_to_webhook(csv_data, "apollo_full_leads.csv",
-                                                   "https://bizmaxus.app.n8n.cloud/webhook-test/csv")
-            st.success("✅ Sent to Test!") if success else st.error(f"❌ {result}")
+            if not st.session_state.intention.strip():
+                st.error("⚠ Please enter an intention before sending.")
+            else:
+                success, result = send_file_to_webhook(
+                    csv_data, "apollo_full_leads.csv",
+                    "https://bizmaxus.app.n8n.cloud/webhook-test/csv",
+                    st.session_state.intention
+                )
+                st.success("✅ Sent to Test!") if success else st.error(f"❌ {result}")
 
     with col3:
         st.download_button("💾 Download CSV", csv_data, "apollo_leads_full.csv", "text/csv")
