@@ -6,6 +6,9 @@ import plotly.express as px
 # --- Page Config ---
 st.set_page_config(page_title="Lead Dashboard", layout="wide", page_icon="📊")
 
+st.sidebar.markdown("## 📊 Lead Dashboard")
+st.sidebar.markdown("Easily monitor leads, interactions & performance.")
+
 # --- Custom CSS for styling ---
 st.markdown("""
     <style>
@@ -30,8 +33,7 @@ st.markdown("""
 
 # --- Sidebar ---
 
-st.sidebar.markdown("## 📊 Lead Dashboard")
-st.sidebar.markdown("Easily monitor leads, interactions & performance.")
+
 
 # --- Fetch Data ---
 FULL_LIST_URL = "https://bizmaxus.app.n8n.cloud/webhook/full-list"
