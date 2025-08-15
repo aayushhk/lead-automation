@@ -3,88 +3,132 @@ import pandas as pd
 import requests
 import plotly.express as px
 
-st.set_page_config(page_title="Lead Dashboard", layout="wide")
-st.title("📊 Lead Interaction Dashboard")
+# --- Page Config ---
+st.set_page_config(page_title="Lead Dashboard", layout="wide", page_icon="📊")
 
-# --- Define endpoints ---
-BASE_URL = "https://bizmaxus.app.n8n.cloud/webhook"
-ENDPOINTS = {
-    "Incoming": f"{BASE_URL}/incoming",
-    "Outgoing": f"{BASE_URL}/outgoing",
-    "SMS": f"{BASE_URL}/sms",
-    "Followup": f"{BASE_URL}/followup",
-    "Replied": f"{BASE_URL}/replied",
-    "Awaiting": f"{BASE_URL}/awaiting",
-    "Calls": f"{BASE_URL}/calls",
-}
+# --- Custom CSS for styling ---
+st.markdown("""
+    <style>
+        .metric-card {
+            padding: 15px;
+            border-radius: 12px;
+            background-color: #f9f9f9;
+            box-shadow: 0px 2px 8px rgba(0,0,0,0.05);
+            text-align: center;
+        }
+        .metric-value {
+            font-size: 26px;
+            font-weight: bold;
+            color: #2E86C1;
+        }
+        .metric-label {
+            font-size: 14px;
+            color: #555;
+        }
+    </style>
+""", unsafe_allow_html=True)
 
-all_dataframes = {}
+# --- Sidebar ---
 
-# --- Fetch all data first ---
-for label, url in ENDPOINTS.items():
-    try:
-        response = requests.get(url)
-        data = response.json()
-        df = pd.DataFrame(data)
-        all_dataframes[label] = df
-    except Exception as e:
-        st.error(f"Failed to fetch {label}: {e}")
-        all_dataframes[label] = pd.DataFrame()
+st.sidebar.markdown("## 📊 Lead Dashboard")
+st.sidebar.markdown("Easily monitor leads, interactions & performance.")
 
-# --- Show counts at top ---
-st.subheader("📦 Lead Category Counts")
-count_cols = st.columns(len(ENDPOINTS))
-for i, (label, df) in enumerate(all_dataframes.items()):
-    with count_cols[i]:
-        st.metric(label, len(df))
+# --- Fetch Data ---
+FULL_LIST_URL = "https://bizmaxus.app.n8n.cloud/webhook/full-list"
+try:
+    response = requests.get(FULL_LIST_URL)
+    response.raise_for_status()
+    data = response.json()
+    df = pd.DataFrame(data)
+except Exception as e:
+    st.error(f"Failed to fetch data: {e}")
+    st.stop()
 
-# --- Show expanders for each dataframe ---
-st.subheader("🗃 Data Views")
-for label, df in all_dataframes.items():
-    with st.expander(f"View {label} DataFrame — {len(df)} records"):
-        st.dataframe(df, use_container_width=True)
+# --- Sidebar Filters ---
+st.sidebar.header("🔍 Filters")
+mode_options = df["mode"].dropna().unique().tolist() if "mode" in df.columns else []
+status_options = df["status"].dropna().unique().tolist() if "status" in df.columns else []
 
-# --- Reply Rate Chart ---
-if "Outgoing" in all_dataframes and "Replied" in all_dataframes:
-    outgoing_count = len(all_dataframes["Outgoing"])
-    replied_count = len(all_dataframes["Replied"])
+selected_modes = st.sidebar.multiselect("Mode", mode_options, default=mode_options)
+selected_statuses = st.sidebar.multiselect("Status", status_options, default=status_options)
 
-    st.subheader("📬 Reply Rate")
+# --- Apply Filters ---
+filtered_df = df.copy()
+if "mode" in filtered_df.columns:
+    filtered_df = filtered_df[filtered_df["mode"].isin(selected_modes)]
+if "status" in filtered_df.columns:
+    filtered_df = filtered_df[filtered_df["status"].isin(selected_statuses)]
 
-    reply_df = pd.DataFrame({
-        "Type": ["Outgoing", "Replied"],
-        "Count": [outgoing_count, replied_count]
-    })
+# --- Top Metrics Row ---
+col1, col2, col3 = st.columns(3)
+with col1:
+    st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-value">{len(df)}</div>
+            <div class="metric-label">Total Leads</div>
+        </div>
+    """, unsafe_allow_html=True)
+with col2:
+    st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-value">{len(filtered_df)}</div>
+            <div class="metric-label">Filtered Leads</div>
+        </div>
+    """, unsafe_allow_html=True)
+with col3:
+    replied_count = filtered_df[filtered_df["status"] == "Replied"].shape[0] if "status" in filtered_df.columns else 0
+    st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-value">{replied_count}</div>
+            <div class="metric-label">Replied</div>
+        </div>
+    """, unsafe_allow_html=True)
 
-    fig_reply = px.pie(reply_df, values="Count", names="Type", title="Reply Rate")
-    st.plotly_chart(fig_reply, use_container_width=True)
+# --- Tabs for Dashboard Views ---
+tab1, tab2, tab3 = st.tabs(["📄 Data Table", "📊 Charts", "⏰ Timeline"])
 
-# --- Time-based Email Activity Chart ---
-st.subheader("⏰ Email Activity Timeline (based on `last email`)")
+# --- Tab 1: Data Table ---
+with tab1:
+    st.dataframe(filtered_df, use_container_width=True)
 
-timestamps = []
-for label, df in all_dataframes.items():
-    if "last email" in df.columns:
+# --- Tab 2: Charts ---
+with tab2:
+    col1, col2 = st.columns(2)
+
+    if "mode" in filtered_df.columns:
+        mode_counts = filtered_df["mode"].value_counts().reset_index()
+        mode_counts.columns = ["Mode", "Count"]
+        fig_mode = px.bar(mode_counts, x="Mode", y="Count", title="Lead Count by Mode", text_auto=True)
+        fig_mode.update_layout(template="plotly_white")
+        col1.plotly_chart(fig_mode, use_container_width=True)
+
+    if "status" in filtered_df.columns:
+        status_counts = filtered_df["status"].value_counts().reset_index()
+        status_counts.columns = ["Status", "Count"]
+        fig_status = px.pie(status_counts, names="Status", values="Count", title="Lead Distribution by Status")
+        fig_status.update_traces(textinfo='percent+label')
+        col2.plotly_chart(fig_status, use_container_width=True)
+
+# --- Tab 3: Timeline ---
+with tab3:
+    if "last email" in filtered_df.columns:
         try:
-            parsed_times = pd.to_datetime(df["last email"], utc=True, errors='coerce')
-            timestamps.extend(parsed_times.dropna())
+            filtered_df["last email"] = pd.to_datetime(filtered_df["last email"], utc=True, errors='coerce')
+            time_df = filtered_df.dropna(subset=["last email"])
+            time_df["Time (Hour)"] = time_df["last email"].dt.strftime('%Y-%m-%d %H:00')
+            hourly_counts = time_df.groupby("Time (Hour)").size().reset_index(name="Emails")
+
+            fig_time = px.bar(
+                hourly_counts,
+                x="Time (Hour)",
+                y="Emails",
+                title="Email Activity by Hour (UTC)",
+                labels={"Emails": "Count", "Time (Hour)": "Hour"},
+            )
+            fig_time.update_xaxes(tickangle=45)
+            fig_time.update_layout(template="plotly_white")
+            st.plotly_chart(fig_time, use_container_width=True)
         except Exception:
-            pass
-
-if timestamps:
-    time_df = pd.DataFrame(timestamps, columns=["Timestamp"])
-    time_df["Time (Hour)"] = time_df["Timestamp"].dt.strftime('%Y-%m-%d %H:00')
-
-    hourly_counts = time_df.groupby("Time (Hour)").size().reset_index(name="Emails")
-
-    fig_time = px.bar(
-        hourly_counts,
-        x="Time (Hour)",
-        y="Emails",
-        title="Email Activity by Hour (UTC)",
-        labels={"Emails": "Count", "Time (Hour)": "Hour"},
-    )
-    fig_time.update_xaxes(tickangle=45)
-    st.plotly_chart(fig_time, use_container_width=True)
-else:
-    st.info("No valid `last email` timestamps found in any dataset.")
+            st.info("No valid `last email` timestamps found.")
+    else:
+        st.info("No `last email` column found in dataset.")
