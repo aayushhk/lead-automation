@@ -12,10 +12,8 @@ st.set_page_config(
     layout="wide"
 )
 
-st.markdown(
-    "🚀 Bulk Lead Processor",
-    unsafe_allow_html=True
-)
+st.header("🚀 Bulk Lead Processor")
+
 
 # --- Inputs ---
 api_key = st.text_input("🔑 Enter your Apollo API Key", type="password")
